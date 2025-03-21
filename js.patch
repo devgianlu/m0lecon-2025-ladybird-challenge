@@ -1,0 +1,347 @@
+diff --git a/Libraries/LibJS/CMakeLists.txt b/Libraries/LibJS/CMakeLists.txt
+index 11ff236023..bf53da5787 100644
+--- a/Libraries/LibJS/CMakeLists.txt
++++ b/Libraries/LibJS/CMakeLists.txt
+@@ -256,6 +256,9 @@ set(SOURCES
+     Runtime/WeakSetPrototype.cpp
+     Runtime/WrapForValidIteratorPrototype.cpp
+     Runtime/WrappedFunction.cpp
++    Runtime/MathArray.cpp
++    Runtime/MathArrayPrototype.cpp
++    Runtime/MathArrayConstructor.cpp
+     Script.cpp
+     SourceCode.cpp
+     SourceTextModule.cpp
+diff --git a/Libraries/LibJS/Forward.h b/Libraries/LibJS/Forward.h
+index 15fffcdb70..559a13e192 100644
+--- a/Libraries/LibJS/Forward.h
++++ b/Libraries/LibJS/Forward.h
+@@ -47,7 +47,8 @@
+     __JS_ENUMERATE(SymbolObject, symbol, SymbolPrototype, SymbolConstructor, void)                                                             \
+     __JS_ENUMERATE(WeakMap, weak_map, WeakMapPrototype, WeakMapConstructor, void)                                                              \
+     __JS_ENUMERATE(WeakRef, weak_ref, WeakRefPrototype, WeakRefConstructor, void)                                                              \
+-    __JS_ENUMERATE(WeakSet, weak_set, WeakSetPrototype, WeakSetConstructor, void)
++    __JS_ENUMERATE(WeakSet, weak_set, WeakSetPrototype, WeakSetConstructor, void)                                                              \
++    __JS_ENUMERATE(MathArray, math_array, MathArrayPrototype, MathArrayConstructor, void)
+
+ #define JS_ENUMERATE_NATIVE_OBJECTS                 \
+     JS_ENUMERATE_NATIVE_OBJECTS_EXCLUDING_TEMPLATES \
+@@ -246,6 +247,10 @@ class JSONObject;
+ class MathObject;
+ class ReflectObject;
+
++class MathArray;
++class MathArrayConstructor;
++class MathArrayPrototype;
++
+ // Tag type used to differentiate between u8 as used by Uint8Array and u8 as used by Uint8ClampedArray.
+ struct ClampedU8;
+
+diff --git a/Libraries/LibJS/Runtime/GlobalObject.cpp b/Libraries/LibJS/Runtime/GlobalObject.cpp
+index c4bc2b80d1..c72d207029 100644
+--- a/Libraries/LibJS/Runtime/GlobalObject.cpp
++++ b/Libraries/LibJS/Runtime/GlobalObject.cpp
+@@ -30,6 +30,7 @@
+ #include <LibJS/Runtime/DateConstructor.h>
+ #include <LibJS/Runtime/DisposableStackConstructor.h>
+ #include <LibJS/Runtime/ErrorConstructor.h>
++#include <LibJS/Runtime/MathArrayConstructor.h>
+ #include <LibJS/Runtime/FinalizationRegistryConstructor.h>
+ #include <LibJS/Runtime/FinalizationRegistryPrototype.h>
+ #include <LibJS/Runtime/FunctionConstructor.h>
+@@ -135,6 +136,7 @@ void set_default_global_bindings(Realm& realm)
+     global.define_intrinsic_accessor(vm.names.Error, attr, [](auto& realm) -> Value { return realm.intrinsics().error_constructor(); });
+     global.define_intrinsic_accessor(vm.names.EvalError, attr, [](auto& realm) -> Value { return realm.intrinsics().eval_error_constructor(); });
+     global.define_intrinsic_accessor(vm.names.FinalizationRegistry, attr, [](auto& realm) -> Value { return realm.intrinsics().finalization_registry_constructor(); });
++    global.define_intrinsic_accessor(vm.names.MathArray, attr, [](auto& realm) -> Value { return realm.intrinsics().math_array_constructor(); });
+     global.define_intrinsic_accessor(vm.names.Float16Array, attr, [](auto& realm) -> Value { return realm.intrinsics().float16_array_constructor(); });
+     global.define_intrinsic_accessor(vm.names.Float32Array, attr, [](auto& realm) -> Value { return realm.intrinsics().float32_array_constructor(); });
+     global.define_intrinsic_accessor(vm.names.Float64Array, attr, [](auto& realm) -> Value { return realm.intrinsics().float64_array_constructor(); });
+diff --git a/Libraries/LibJS/Runtime/Intrinsics.cpp b/Libraries/LibJS/Runtime/Intrinsics.cpp
+index 35a7bb0687..d22495112c 100644
+--- a/Libraries/LibJS/Runtime/Intrinsics.cpp
++++ b/Libraries/LibJS/Runtime/Intrinsics.cpp
+@@ -96,6 +96,8 @@
+ #include <LibJS/Runtime/Shape.h>
+ #include <LibJS/Runtime/SharedArrayBufferConstructor.h>
+ #include <LibJS/Runtime/SharedArrayBufferPrototype.h>
++#include <LibJS/Runtime/MathArrayConstructor.h>
++#include <LibJS/Runtime/MathArrayPrototype.h>
+ #include <LibJS/Runtime/StringConstructor.h>
+ #include <LibJS/Runtime/StringIteratorPrototype.h>
+ #include <LibJS/Runtime/StringPrototype.h>
+diff --git a/Libraries/LibJS/Runtime/MathArray.cpp b/Libraries/LibJS/Runtime/MathArray.cpp
+new file mode 100644
+index 0000000000..2b2c204e88
+--- /dev/null
++++ b/Libraries/LibJS/Runtime/MathArray.cpp
+@@ -0,0 +1,21 @@
++/*
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <LibJS/Runtime/MathArray.h>
++
++namespace JS {
++
++GC_DEFINE_ALLOCATOR(MathArray);
++
++ThrowCompletionOr<GC::Ref<MathArray>> MathArray::create(Realm& realm, GC::Ref<JS::Array> array) {
++    return realm.heap().allocate<MathArray>(array, realm.intrinsics().math_array_prototype());
++}
++
++MathArray::MathArray(GC::Ref<JS::Array> array, Object& prototype)
++    : Object(ConstructWithPrototypeTag::Tag, prototype)
++    , m_array(array)
++{
++}
++
++}
+diff --git a/Libraries/LibJS/Runtime/MathArray.h b/Libraries/LibJS/Runtime/MathArray.h
+new file mode 100644
+index 0000000000..56a5d13019
+--- /dev/null
++++ b/Libraries/LibJS/Runtime/MathArray.h
+@@ -0,0 +1,30 @@
++/*
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <LibJS/Runtime/Array.h>
++#include <LibJS/Runtime/Object.h>
++
++namespace JS {
++
++class MathArray : public Object {
++    JS_OBJECT(MathArray, Object);
++    GC_DECLARE_ALLOCATOR(MathArray);
++
++public:
++    static ThrowCompletionOr<GC::Ref<MathArray>> create(Realm&, GC::Ref<JS::Array>);
++
++    virtual ~MathArray() override = default;
++
++    GC::Ptr<JS::Array> underlying_array() const { return m_array; }
++
++protected:
++    explicit MathArray(GC::Ref<JS::Array>, Object&);
++
++private:
++    GC::Ref<JS::Array> m_array;
++};
++
++}
+diff --git a/Libraries/LibJS/Runtime/MathArrayConstructor.cpp b/Libraries/LibJS/Runtime/MathArrayConstructor.cpp
+new file mode 100644
+index 0000000000..dcc83683a0
+--- /dev/null
++++ b/Libraries/LibJS/Runtime/MathArrayConstructor.cpp
+@@ -0,0 +1,58 @@
++/*
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <LibJS/Runtime/AbstractOperations.h>
++#include <LibJS/Runtime/Array.h>
++#include <LibJS/Runtime/MathArray.h>
++#include <LibJS/Runtime/MathArrayConstructor.h>
++#include <LibJS/Runtime/GlobalObject.h>
++
++namespace JS {
++
++GC_DEFINE_ALLOCATOR(MathArrayConstructor);
++
++MathArrayConstructor::MathArrayConstructor(Realm& realm)
++    : NativeFunction(realm.vm().names.Array.as_string(), realm.intrinsics().function_prototype())
++{
++}
++
++void MathArrayConstructor::initialize(Realm& realm)
++{
++    auto& vm = this->vm();
++    Base::initialize(realm);
++
++    define_direct_property(vm.names.prototype, realm.intrinsics().math_array_prototype(), 0);
++}
++
++ThrowCompletionOr<Value> MathArrayConstructor::call()
++{
++    return TRY(construct(*this));
++}
++
++ThrowCompletionOr<GC::Ref<Object>> MathArrayConstructor::construct(FunctionObject& new_target)
++{
++    auto& vm = this->vm();
++
++    if (vm.argument_count() != 1)
++        return vm.throw_completion<TypeError>("MathArray constructor expects exactly one argument"sv);
++
++    auto user_array_value = vm.argument(0);
++    if (!TRY(user_array_value.is_array(vm)))
++        return vm.throw_completion<TypeError>("MathArray argument should be an array"sv);
++
++    auto& user_array = user_array_value.as_array();
++
++    auto new_array = TRY(Array::create(*vm.current_realm(), user_array.indexed_properties().array_like_size()));
++    for (auto const& it : user_array.indexed_properties().indices()) {
++        auto it_value = user_array.indexed_properties().get(it);
++        if (!it_value.has_value() || !it_value->value.is_number())
++            return vm.throw_completion<TypeError>("MathArray argument should be an array of numbers"sv);
++
++        TRY(new_array->create_data_property_or_throw(it, it_value->value));
++    }
++
++    return TRY(ordinary_create_from_constructor<MathArray>(vm, new_target, &Intrinsics::math_array_prototype, new_array));
++}
++
++}
+diff --git a/Libraries/LibJS/Runtime/MathArrayConstructor.h b/Libraries/LibJS/Runtime/MathArrayConstructor.h
+new file mode 100644
+index 0000000000..9580b74cc8
+--- /dev/null
++++ b/Libraries/LibJS/Runtime/MathArrayConstructor.h
+@@ -0,0 +1,28 @@
++/*
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <LibJS/Runtime/NativeFunction.h>
++
++namespace JS {
++
++class MathArrayConstructor final : public NativeFunction {
++    JS_OBJECT(MathArrayConstructor, NativeFunction);
++    GC_DECLARE_ALLOCATOR(MathArrayConstructor);
++
++public:
++    virtual void initialize(Realm&) override;
++    virtual ~MathArrayConstructor() override = default;
++
++    virtual ThrowCompletionOr<Value> call() override;
++    virtual ThrowCompletionOr<GC::Ref<Object>> construct(FunctionObject& new_target) override;
++
++private:
++    explicit MathArrayConstructor(Realm&);
++
++    virtual bool has_constructor() const override { return true; }
++};
++
++}
+diff --git a/Libraries/LibJS/Runtime/MathArrayPrototype.cpp b/Libraries/LibJS/Runtime/MathArrayPrototype.cpp
+new file mode 100644
+index 0000000000..e2d18b59fc
+--- /dev/null
++++ b/Libraries/LibJS/Runtime/MathArrayPrototype.cpp
+@@ -0,0 +1,62 @@
++/*
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#include <LibJS/Runtime/MathArray.h>
++#include <LibJS/Runtime/MathArrayConstructor.h>
++#include <LibJS/Runtime/MathArrayPrototype.h>
++
++namespace JS {
++
++GC_DEFINE_ALLOCATOR(MathArrayPrototype);
++
++MathArrayPrototype::MathArrayPrototype(Realm& realm)
++    : PrototypeObject(realm.intrinsics().object_prototype())
++{
++}
++
++void MathArrayPrototype::initialize(Realm& realm)
++{
++    auto& vm = this->vm();
++    Base::initialize(realm);
++
++    u8 attr = Attribute::Writable | Attribute::Configurable;
++    define_native_function(realm, vm.names.at, at, 1, attr);
++    define_native_function(realm, vm.names.add, add, 1, attr);
++}
++
++JS_DEFINE_NATIVE_FUNCTION(MathArrayPrototype::at)
++{
++    auto this_object = TRY(typed_this_value(vm));
++
++    auto index = TRY(vm.argument(0).to_index(vm));
++    auto value = this_object->underlying_array()->indexed_properties().get(index);
++    if (!value.has_value())
++        return js_undefined();
++
++    return value->value;
++}
++
++JS_DEFINE_NATIVE_FUNCTION(MathArrayPrototype::add)
++{
++    auto this_object = TRY(typed_this_value(vm));
++
++    auto amount = TRY(vm.argument(0).to_number(vm)).as_i32_clamped_integral_number();
++    if (amount < -0x100 || amount > 0x100)
++        return vm.throw_completion<TypeError>("Amount should be in the range of -0x100 to 0x100"sv);
++
++    auto& indexed_properties = this_object->underlying_array()->indexed_properties();
++    for (auto index : indexed_properties.indices()) {
++        auto value = indexed_properties.get(index);
++        if (!value.has_value())
++            continue;
++
++        auto num_value = bit_cast<size_t>(value->value);
++        num_value += amount;
++        indexed_properties.put(index, bit_cast<Value>(num_value));
++    }
++
++    return js_undefined();
++}
++
++}
+diff --git a/Libraries/LibJS/Runtime/MathArrayPrototype.h b/Libraries/LibJS/Runtime/MathArrayPrototype.h
+new file mode 100644
+index 0000000000..2f8a85d898
+--- /dev/null
++++ b/Libraries/LibJS/Runtime/MathArrayPrototype.h
+@@ -0,0 +1,27 @@
++/*
++ * SPDX-License-Identifier: BSD-2-Clause
++ */
++
++#pragma once
++
++#include <LibJS/Runtime/MathArray.h>
++#include <LibJS/Runtime/PrototypeObject.h>
++
++namespace JS {
++
++class MathArrayPrototype final : public PrototypeObject<MathArrayPrototype, MathArray> {
++    JS_PROTOTYPE_OBJECT(MathArrayPrototype, MathArray, MathArray);
++    GC_DECLARE_ALLOCATOR(MathArrayPrototype);
++
++public:
++    virtual void initialize(Realm&) override;
++    virtual ~MathArrayPrototype() override = default;
++
++    JS_DECLARE_NATIVE_FUNCTION(at);
++    JS_DECLARE_NATIVE_FUNCTION(add);
++
++private:
++    explicit MathArrayPrototype(Realm&);
++};
++
++}
+diff --git a/Utilities/js.cpp b/Utilities/js.cpp
+index 10a1c00ff0..8ad2dd6e60 100644
+--- a/Utilities/js.cpp
++++ b/Utilities/js.cpp
+@@ -412,8 +412,6 @@ void ScriptObject::initialize(JS::Realm& realm)
+
+     define_direct_property("global", this, JS::Attribute::Enumerable);
+     u8 attr = JS::Attribute::Configurable | JS::Attribute::Writable | JS::Attribute::Enumerable;
+-    define_native_function(realm, "loadINI", load_ini, 1, attr);
+-    define_native_function(realm, "loadJSON", load_json, 1, attr);
+     define_native_function(realm, "print", print, 1, attr);
+ }
+

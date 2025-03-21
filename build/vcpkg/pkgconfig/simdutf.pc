@@ -1,0 +1,12 @@
+prefix=${pcfiledir}/../..
+includedir=${prefix}/include
+libdir=${prefix}/lib
+
+Name: simdutf
+Description: Fast Unicode validation, transcoding and processing
+URL: 
+Version: 5.6.0
+Cflags: "-I${includedir}" 
+Libs: "-L${libdir}" -lsimdutf
+
+

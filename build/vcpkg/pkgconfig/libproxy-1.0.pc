@@ -1,0 +1,11 @@
+prefix=${pcfiledir}/../..
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: libproxy-1.0
+Description: Proxy Configuration Library
+Version: 0.4.18
+Libs: "-L${libdir}" -lproxy
+Libs.private: -lpthread -lm
+Cflags: "-I${includedir}" 
+

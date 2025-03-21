@@ -1,0 +1,12 @@
+prefix=${pcfiledir}/../..
+includedir=${prefix}/include
+libdir=${prefix}/lib
+
+Name: harfbuzz-icu
+Description: HarfBuzz text shaping library ICU integration
+Version: 10.2.0
+Requires: harfbuzz =  10.2.0
+Requires.private: icu-uc >=  49.0
+Libs: "-L${libdir}" -lharfbuzz-icu
+Cflags: "-I${includedir}/harfbuzz"
+

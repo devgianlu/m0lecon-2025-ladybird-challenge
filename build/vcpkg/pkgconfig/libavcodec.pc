@@ -1,0 +1,15 @@
+prefix=${pcfiledir}/../..
+exec_prefix=${prefix}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: libavcodec
+Description: FFmpeg codec library
+Version: 61.19.100
+Requires: 
+Requires.private: libswresample >= 5.3.100, libavutil >= 59.39.100
+Conflicts:
+Libs: "-L${libdir}" -lavcodec
+Libs.private: "-L${prefix}/lib/pkgconfig/../../lib" -lvpx -lm -lpthread "-L${prefix}/lib/pkgconfig/../../lib" -lvpx -lm -lpthread "-L${prefix}/lib/pkgconfig/../../lib" -lvpx -lm -lpthread "-L${prefix}/lib/pkgconfig/../../lib" -lvpx -lm -lpthread "-L${prefix}/lib/pkgconfig/../../lib" -lwebpmux -pthread -lm -latomic "-L${prefix}/lib/pkgconfig/../../lib" -ldav1d "-L${prefix}/lib/pkgconfig/../../lib" -lopus -ltheoraenc -ltheoradec -logg "-L${prefix}/lib/pkgconfig/../../lib" -lvorbis "-L${prefix}/lib/pkgconfig/../../lib" -lvorbisenc "-L${prefix}/lib/pkgconfig/../../lib" -lwebp "-L${prefix}/lib/pkgconfig/../../lib" -lopenh264 "-L${prefix}/lib/pkgconfig/../../lib" -lz
+Cflags: "-I${includedir}"
+
